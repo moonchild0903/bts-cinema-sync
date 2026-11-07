@@ -116,8 +116,13 @@
         }
 
         socket.on('update-color', (data) => {
+            // Cambia el círculo visual en pantalla
             document.getElementById('lightCircle').style.backgroundColor = data.color;
-            sendColorToBluetooth(data.color);
+            
+            // Envía el color al lightstick conectado por Bluetooth automáticamente
+            if (typeof sendColorToBluetooth === 'function') {
+                sendColorToBluetooth(data.color);
+            }
         });
 
         async function connectArmyBomb() {
