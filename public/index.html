@@ -67,13 +67,14 @@
         <p>Estado del Lightstick:</p>
         <div id="colorBox"></div>
         
-        <!-- Panel de Super Admin (visible solo si entras como Admin) -->
+        <!-- Panel de Super Admin -->
         <div id="adminPanel" style="display:none; margin-top:20px; border-top: 1px solid #444; padding-top: 15px;">
             <h3>Panel de Control Admin</h3>
-            <button onclick="changeColor('#ff0000')">Rojo (ARMY Bomb)</button>
-            <button onclick="changeColor('#8A2BE2')">Morado (BTS)</button>
-            <button onclick="changeColor('#00ffff')">Azul</button>
-            <button style="background-color: #ff4757;" onclick="closeAllRooms()">¡Enviar Mensaje Global de Cierre!</button>
+            <p>Controlando: <strong>Sala-1</strong></p>
+            <p style="margin-bottom: 10px;">Desliza para elegir el color:</p>
+            <input type="color" id="colorPicker" value="#ff0000" oninput="sendColor(this.value)" style="width: 80px; height: 80px; border: none; border-radius: 50%; cursor: pointer; background: none; outline: none;">
+            <br><br>
+            <button style="background-color: #ff4757; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;" onclick="closeAllRooms()">¡Enviar Mensaje Global de Cierre!</button>
         </div>
     </div>
 
@@ -110,6 +111,9 @@
 
         function closeAllRooms() {
             socket.emit('close-all-rooms');
+        }
+        function sendColor(color) {
+            socket.emit('change-color', { room: 'admin', targetRoom: 'Sala-1', color: color });
         }
 
         // Recibir actualización de color en tiempo real

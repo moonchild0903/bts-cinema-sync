@@ -18,7 +18,11 @@ io.on('connection', (socket) => {
     });
 
     socket.on('change-color', (data) => {
-        io.to(data.room).emit('update-color', data);
+        if (data.room === 'admin' || data.targetRoom) {
+            io.to(data.targetRoom || 'Sala-1').emit('update-color', { color: data.color });
+        } else {
+            io.to(data.room).emit('update-color', data);
+        }
     });
 
     socket.on('close-all-rooms', () => {
