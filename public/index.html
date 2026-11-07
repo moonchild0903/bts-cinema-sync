@@ -119,7 +119,6 @@
                 const status = document.getElementById('btStatus');
                 status.innerText = 'Buscando Army Bomb...';
                 
-                // Filtramos por los nombres oficiales y los servicios BLE específicos del lightstick
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
                     filters: [
                         { namePrefix: 'ARMY BOMB' },
@@ -127,16 +126,13 @@
                         { namePrefix: 'MAP OF THE SOUL' },
                         { namePrefix: 'BTS LIGHTSTICK' }
                     ],
-                    optionalServices: [
-                        '0000ffe0-0000-1000-8000-00805f9b34fb', // Servicio estándar UART común
-                        'ffe0', 
-                        '6e400001-b5a3-f393-e0a9-e50e24dcca9e'  // Perfil de control de iluminación oficial
-                    ]
+                    optionalServices: []
                 });
 
-                status.innerText = 'Conectando al Lightstick...';
+                status.innerText = 'Conectando al dispositivo...';
                 const server = await bluetoothDevice.gatt.connect();
                 
+                status.innerText = 'Buscando canal de color...';
                 const services = await server.getPrimaryServices();
                 colorCharacteristic = null;
 
@@ -151,19 +147,19 @@
                         }
                         if (colorCharacteristic) break;
                     } catch (err) {
-                        console.log("Omitiendo servicio:", err);
+                        console.log("Servicio omitido:", err);
                     }
                 }
 
                 if (!colorCharacteristic) {
-                    throw new Error("No se encontró la característica de escritura.");
+                    throw new Error("No se encontró canal de escritura compatible.");
                 }
 
                 status.innerText = '¡Army Bomb conectada con éxito!';
                 status.style.color = '#00cec9';
             } catch (error) {
                 console.error('Error de Bluetooth:', error);
-                document.getElementById('btStatus').innerText = 'Error al conectar. Asegúrate de cerrar la app oficial.';
+                document.getElementById('btStatus').innerText = 'No se pudo conectar. Intenta de nuevo.';
             }
         }
 
