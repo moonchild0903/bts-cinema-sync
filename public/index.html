@@ -187,19 +187,20 @@
             let g = parseInt(hexColor.slice(3, 5), 16);
             let b = parseInt(hexColor.slice(5, 7), 16);
 
-            // Trama de comandos compatible con el firmware oficial de las Army Bombs (Header + RGB)
-            // Usamos un array de bytes estructurado para control de iluminación BLE
-            let byteArray = new Uint8Array([0x6b, 0x02, 0x00, r, g, b]);
+            // Lista de posibles tramas de bytes utilizadas por los diferentes firmwares de Army Bomb
+            const packets = [
+                new Uint8Array([0x6b, 0x02, 0x00, r, g, b]),
+                new Uint8Array([0x50, r, g, b]),
+                new Uint8Array([0x70, r, g, b]),
+                new Uint8Array([0x20, r, g, b])
+            ];
 
-            try {
-                await colorCharacteristic.writeValue(byteArray);
-            } catch (error) {
+            for (let packet of packets) {
                 try {
-                    // Fallback a trama alternativa de un solo byte si el firmware requiere otro formato
-                    let altArray = new Uint8Array([0x50, r, g, b]);
-                    await colorCharacteristic.writeValue(altArray);
-                } catch (err) {
-                    console.error('Error al enviar color por Bluetooth:', err);
+                    await colorCharacteristic.writeValue(packet);
+                    break; // Envío exitoso
+                } catch (error) {
+                    console.log("Probando trama alternativa...", error);
                 }
             }
         }
