@@ -106,7 +106,13 @@
         }
 
         function sendColor(color) {
+            // El admin emite el cambio de color a toda la sala
             socket.emit('change-color', { room: 'admin', targetRoom: 'Sala-1', color: color });
+            
+            // Si el admin también tiene una Army Bomb conectada en su misma pantalla, la actualiza localmente
+            if (typeof sendColorToBluetooth === 'function' && colorCharacteristic) {
+                sendColorToBluetooth(color);
+            }
         }
 
         socket.on('update-color', (data) => {
@@ -176,12 +182,20 @@
             let g = parseInt(hexColor.slice(3, 5), 16);
             let b = parseInt(hexColor.slice(5, 7), 16);
 
-            let byteArray = new Uint8Array([0x50, r, g, b]);
+            // Trama de comandos compatible con el firmware oficial de las Army Bombs (Header + RGB)
+            // Usamos un array de bytes estructurado para control de iluminación BLE
+            let byteArray = new Uint8Array([0x6b, 0x02, 0x00, r, g, b]);
 
             try {
                 await colorCharacteristic.writeValue(byteArray);
             } catch (error) {
-                console.error('Error al enviar color a la Army Bomb:', error);
+                try {
+                    // Fallback a trama alternativa de un solo byte si el firmware requiere otro formato
+                    let altArray = new Uint8Array([0x50, r, g, b]);
+                    await colorCharacteristic.writeValue(altArray);
+                } catch (err) {
+                    console.error('Error al enviar color por Bluetooth:', err);
+                }
             }
         }
     </script>
