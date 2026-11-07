@@ -119,32 +119,72 @@
                 const status = document.getElementById('btStatus');
                 status.innerText = 'Buscando Army Bomb...';
                 
-                // Solicitamos el dispositivo filtrando por nombre y declarando los servicios oficiales requeridos por el navegador
+                // Abrimos el selector con acceptAllDevices para ver el lightstick sin filtros estrictos de nombre
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
-                    filters: [
-                        { namePrefix: 'ARMY BOMB' },
-                        { namePrefix: 'BTS' },
-                        { namePrefix: 'MAP OF THE SOUL' },
-                        { namePrefix: 'BTS LIGHTSTICK' }
-                    ],
+                    acceptAllDevices: true,
                     optionalServices: [
-                        '0000ffe0-0000-1000-8000-00805f9b34fb', // Servicio UART estándar de control
-                        '0000180a-0000-1000-8000-00805f9b34fb'  // Servicio de información del dispositivo
+                        '0000ffe0-0000-1000-8000-00805f9b34fb', // UART estándar (CC254x)
+                        '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISSC UART (perfil común en merch oficial)
+                        '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART Service
+                        '0000fff0-0000-1000-8000-00805f9b34fb', // Servicio FFF0
+                        '0000180a-0000-1000-8000-00805f9b34fb'  // Información del dispositivo
                     ]
                 });
 
                 status.innerText = 'Conectando al dispositivo...';
                 const server = await bluetoothDevice.gatt.connect();
                 
-                // Obtenemos directamente el servicio UART oficial del lightstick
-                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
-                colorCharacteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+                status.innerText = 'Buscando canal de color...';
+                colorCharacteristic = null;
+
+                // Lista de UUIDs de servicios de control a evaluar
+                const serviceUuids = [
+                    '0000ffe0-0000-1000-8000-00805f9b34fb',
+                    '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+                    '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+                    '0000fff0-0000-1000-8000-00805f9b34fb'
+                ];
+
+                for (const uuid of serviceUuids) {
+                    try {
+                        const service = await server.getPrimaryService(uuid);
+                        const chars = await service.getCharacteristics();
+                        for (const char of chars) {
+                            if (char.properties.write || char.properties.writeWithoutResponse) {
+                                colorCharacteristic = char;
+                                break;
+                            }
+                        }
+                        if (colorCharacteristic) break;
+                    } catch (e) {
+                        // Continúa probando con el siguiente perfil si este no aplica
+                    }
+                }
+
+                // Respaldo de escaneo general si el UUID específico no coincidió
+                if (!colorCharacteristic) {
+                    const services = await server.getPrimaryServices();
+                    for (const service of services) {
+                        const chars = await service.getCharacteristics();
+                        for (const char of chars) {
+                            if (char.properties.write || char.properties.writeWithoutResponse) {
+                                colorCharacteristic = char;
+                                break;
+                            }
+                        }
+                        if (colorCharacteristic) break;
+                    }
+                }
+
+                if (!colorCharacteristic) {
+                    throw new Error("No se encontró canal de escritura compatible.");
+                }
 
                 status.innerText = '¡Army Bomb conectada con éxito!';
                 status.style.color = '#00cec9';
             } catch (error) {
                 console.error('Error de Bluetooth:', error);
-                document.getElementById('btStatus').innerText = 'Error al conectar. Asegúrate de cerrar la app oficial.';
+                document.getElementById('btStatus').innerText = 'Error al conectar. Verifica que el lightstick esté encendido.';
             }
         }
 
