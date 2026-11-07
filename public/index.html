@@ -119,17 +119,24 @@
                 const status = document.getElementById('btStatus');
                 status.innerText = 'Buscando Army Bomb...';
                 
-                // Abrimos el selector para cualquier dispositivo cercano
+                // Filtramos por los nombres oficiales y los servicios BLE específicos del lightstick
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: []
+                    filters: [
+                        { namePrefix: 'ARMY BOMB' },
+                        { namePrefix: 'BTS' },
+                        { namePrefix: 'MAP OF THE SOUL' },
+                        { namePrefix: 'BTS LIGHTSTICK' }
+                    ],
+                    optionalServices: [
+                        '0000ffe0-0000-1000-8000-00805f9b34fb', // Servicio estándar UART común
+                        'ffe0', 
+                        '6e400001-b5a3-f393-e0a9-e50e24dcca9e'  // Perfil de control de iluminación oficial
+                    ]
                 });
 
-                status.innerText = 'Conectando al dispositivo...';
+                status.innerText = 'Conectando al Lightstick...';
                 const server = await bluetoothDevice.gatt.connect();
                 
-                // Búsqueda automática y universal de características de escritura (Ver. 3, SE y 4)
-                status.innerText = 'Buscando canal de color...';
                 const services = await server.getPrimaryServices();
                 colorCharacteristic = null;
 
@@ -144,19 +151,19 @@
                         }
                         if (colorCharacteristic) break;
                     } catch (err) {
-                        console.log("Servicio omitido:", err);
+                        console.log("Omitiendo servicio:", err);
                     }
                 }
 
                 if (!colorCharacteristic) {
-                    throw new Error("No se encontró canal de escritura Bluetooth compatible.");
+                    throw new Error("No se encontró la característica de escritura.");
                 }
 
-                status.innerText = '¡Army Bomb conectada vía Bluetooth!';
+                status.innerText = '¡Army Bomb conectada con éxito!';
                 status.style.color = '#00cec9';
             } catch (error) {
                 console.error('Error de Bluetooth:', error);
-                document.getElementById('btStatus').innerText = 'No se pudo conectar. Verifica que esté en modo Bluetooth.';
+                document.getElementById('btStatus').innerText = 'Error al conectar. Asegúrate de cerrar la app oficial.';
             }
         }
 
