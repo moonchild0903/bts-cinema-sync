@@ -119,6 +119,7 @@
                 const status = document.getElementById('btStatus');
                 status.innerText = 'Buscando Army Bomb...';
                 
+                // Usamos acceptAllDevices y optionalServices abiertos para permitir la conexión universal
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: [
@@ -127,7 +128,8 @@
                         '49535343-fe7d-4ae5-8fa9-9fafd205e455',
                         '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
                         '0000fff0-0000-1000-8000-00805f9b34fb',
-                        '0000180a-0000-1000-8000-00805f9b34fb'
+                        '0000180a-0000-1000-8000-00805f9b34fb',
+                        '00001800-0000-1000-8000-00805f9b34fb'
                     ]
                 });
 
@@ -135,9 +137,11 @@
                 const server = await bluetoothDevice.gatt.connect();
                 
                 status.innerText = 'Buscando canal de color...';
-                const services = await server.getPrimaryServices();
                 colorCharacteristic = null;
 
+                // Obtenemos todos los servicios disponibles directamente del servidor
+                const services = await server.getPrimaryServices();
+                
                 for (const service of services) {
                     try {
                         const characteristics = await service.getCharacteristics();
@@ -149,12 +153,12 @@
                         }
                         if (colorCharacteristic) break;
                     } catch (err) {
-                        console.log("Servicio omitido:", err);
+                        console.log("Omitiendo servicio protegido:", err);
                     }
                 }
 
                 if (!colorCharacteristic) {
-                    throw new Error("No se encontró canal de escritura.");
+                    throw new Error("No se encontró ningún canal de escritura compatible.");
                 }
 
                 status.innerText = '¡Army Bomb conectada con éxito!';
