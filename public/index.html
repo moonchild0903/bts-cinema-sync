@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BTS Cinema Sync - Sincronización de Lightsticks</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            text-align: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        input, button, select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: none;
+            font-size: 16px;
+        }
+        button {
+            background-color: #8A2BE2;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #7A1BE2;
+        }
+        #colorBox {
+            width: 100px;
+            height: 100px;
+            margin: 20px auto;
+            border-radius: 50%;
+            background-color: #000;
+            border: 2px solid #fff;
+        }
+        #closingMessage {
+            display: none;
+            font-size: 24px;
+            color: #ff4757;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="loginScreen">
+        <h2>Conectar a Sala</h2>
+        <input type="text" id="roomInput" placeholder="Ej. Sala-1">
+        <button onclick="joinRoom()">Entrar a la Sala</button>
+    </div>
+
+    <div class="container" id="appScreen" style="display:none;">
+        <h2 id="roomTitle"></h2>
+        <p>Estado del Lightstick:</p>
+        <div id="colorBox"></div>
+        
+        <!-- Panel de Super Admin (visible solo si entras como Admin) -->
+        <div id="adminPanel" style="display:none; margin-top:20px; border-top: 1px solid #444; padding-top: 15px;">
+            <h3>Panel de Control Admin</h3>
+            <button onclick="changeColor('#ff0000')">Rojo (ARMY Bomb)</button>
+            <button onclick="changeColor('#8A2BE2')">Morado (BTS)</button>
+            <button onclick="changeColor('#00ffff')">Azul</button>
+            <button style="background-color: #ff4757;" onclick="closeAllRooms()">¡Enviar Mensaje Global de Cierre!</button>
+        </div>
+    </div>
+
+    <div id="closingMessage">¡Gracias por acompañarnos en esta función de BTS! 💜</div>
+
+    <!-- Cargar Socket.io -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let currentRoom = '';
+
+        function joinRoom() {
+            const room = document.getElementById('roomInput').value.trim();
+            if (!room) {
+                alert('Escribe el nombre de una sala');
+                return;
+            }
+            currentRoom = room;
+            socket.emit('join-room', room);
+
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('appScreen').style.display = 'block';
+            document.getElementById('roomTitle').innerText = `Conectado a: ${room}`;
+
+            // Si entran a una sala llamada "admin", habilitamos el panel de control
+            if (room.toLowerCase() === 'admin') {
+                document.getElementById('adminPanel').style.display = 'block';
+            }
+        }
+
+        function changeColor(color) {
+            socket.emit('change-color', { room: currentRoom, color: color });
+        }
+
+        function closeAllRooms() {
+            socket.emit('close-all-rooms');
+        }
+
+        // Recibir actualización de color en tiempo real
+        socket.on('update-color', (data) => {
+            document.getElementById('colorBox').style.backgroundColor = data.color;
+        });
+
+        // Recibir mensaje global de cierre
+        socket.on('show-closing-message', () => {
+            document.getElementById('appScreen').style.display = 'none';
+            document.getElementById('closingMessage').style.display = 'block';
+        });
+    </script>
+</body>
+</html>
