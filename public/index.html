@@ -121,7 +121,14 @@
                 
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
-                    optionalServices: []
+                    optionalServices: [
+                        '0000ffe0-0000-1000-8000-00805f9b34fb',
+                        '0000ffe1-0000-1000-8000-00805f9b34fb',
+                        '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+                        '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+                        '0000fff0-0000-1000-8000-00805f9b34fb',
+                        '0000180a-0000-1000-8000-00805f9b34fb'
+                    ]
                 });
 
                 status.innerText = 'Conectando al dispositivo...';
@@ -135,7 +142,6 @@
                     try {
                         const characteristics = await service.getCharacteristics();
                         for (const characteristic of characteristics) {
-                            // Buscamos cualquier característica que permita escritura (con o sin respuesta)
                             if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
                                 colorCharacteristic = characteristic;
                                 break;
@@ -155,7 +161,7 @@
                 status.style.color = '#00cec9';
             } catch (error) {
                 console.error('Error de Bluetooth:', error);
-                document.getElementById('btStatus').innerText = 'Error al conectar. Verifica que el lightstick esté encendido.';
+                document.getElementById('btStatus').innerText = 'Error: ' + error.message;
             }
         }
 
