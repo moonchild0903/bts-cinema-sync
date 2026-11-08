@@ -110,16 +110,20 @@
         async function connectArmyBomb() {
             try {
                 const status = document.getElementById('btStatus');
-                status.innerText = 'Buscando Army Bomb SE...';
+                status.innerText = 'Buscando Army Bomb ...';
                 
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
+                    // Incluimos todos los servicios posibles para forzar al navegador a descubrirlos
                     optionalServices: [
                         '0000ffe0-0000-1000-8000-00805f9b34fb',
                         '0000ffe1-0000-1000-8000-00805f9b34fb',
                         '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+                        '6e400002-b5a3-f393-e0a9-e50e24dcca9e',
+                        '49535343-fe7d-4ae5-8fa9-9fafd205e455',
                         '0000fff0-0000-1000-8000-00805f9b34fb',
-                        '0000180a-0000-1000-8000-00805f9b34fb'
+                        '0000180a-0000-1000-8000-00805f9b34fb',
+                        '00001800-0000-1000-8000-00805f9b34fb'
                     ]
                 });
 
@@ -138,12 +142,7 @@
                             let uuid = characteristic.uuid.toLowerCase();
                             console.log(`Canal: ${uuid} | Propiedades:`, characteristic.properties);
                             
-                            // Descartamos totalmente los canales genéricos del sistema
-                            if (uuid.startsWith('0002a') || uuid.includes('0002a00')) {
-                                continue;
-                            }
-
-                            // Priorizamos o buscamos directamente el canal FFE1 o uno con escritura real
+                            // Si encontramos el canal ffe1 o un canal con escritura real, lo tomamos sin darnos por vencidos
                             if (uuid.includes('ffe1') || uuid.includes('6e400002') || characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
                                 colorCharacteristic = characteristic;
                                 console.log(" ¡Canal de escritura SELECCIONADO con éxito!", uuid);
@@ -153,6 +152,23 @@
                         if (colorCharacteristic) break;
                     } catch (err) {
                         console.log("Omitiendo servicio:", err);
+                    }
+                }
+
+                // Plan de respaldo: Si el filtro estricto no halló nada, tomamos la primera característica disponible que tenga escritura
+                if (!colorCharacteristic) {
+                    for (const service of services) {
+                        try {
+                            const characteristics = await service.getCharacteristics();
+                            for (const characteristic of characteristics) {
+                                if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+                                    colorCharacteristic = characteristic;
+                                    console.log(" Canal asignado por respaldo de escritura:", characteristic.uuid);
+                                    break;
+                                }
+                            }
+                            if (colorCharacteristic) break;
+                        } catch (e) {}
                     }
                 }
 
@@ -191,9 +207,9 @@
                     await colorCharacteristic.writeValue(byteArray);
                 }
                 
-                console.log(`✅ Color enviado a la Army Bomb SE: R=${r}, G=${g}, B=${b}`);
+                console.log(` Color enviado a la Army Bomb SE: R=${r}, G=${g}, B=${b}`);
             } catch (error) {
-                console.error('❌ Error al escribir en el Bluetooth:', error);
+                console.error(' Error al escribir en el Bluetooth:', error);
             } finally {
                 isWriting = false;
                 if (pendingColor) {
