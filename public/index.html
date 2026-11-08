@@ -111,15 +111,19 @@
                 const status = document.getElementById('btStatus');
                 status.innerText = 'Buscando Army Bomb SE...';
                 
+                // Filtramos directamente por los UUIDs para forzar al navegador a exponer FFE0/FFE1
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
+                    filters: [
+                        { services: ['0000ffe0-0000-1000-8000-00805f9b34fb'] },
+                        { services: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] },
+                        { namePrefix: 'BTS' },
+                        { namePrefix: 'Army' }
+                    ],
                     optionalServices: [
                         '0000ffe0-0000-1000-8000-00805f9b34fb',
                         '0000ffe1-0000-1000-8000-00805f9b34fb',
                         '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
-                        '6e400002-b5a3-f393-e0a9-e50e24dcca9e',
-                        '0000fff0-0000-1000-8000-00805f9b34fb',
-                        '0000180a-0000-1000-8000-00805f9b34fb'
+                        '6e400002-b5a3-f393-e0a9-e50e24dcca9e'
                     ]
                 });
 
@@ -130,7 +134,6 @@
                 colorCharacteristic = null;
 
                 const services = await server.getPrimaryServices();
-                let candidateCharacteristics = [];
                 
                 for (const service of services) {
                     try {
@@ -139,29 +142,26 @@
                             let uuid = characteristic.uuid.toLowerCase();
                             console.log(`Canal detectado: ${uuid} | Propiedades:`, characteristic.properties);
                             
-                            // Guardamos cualquier característica que tenga permisos de escritura o escritura sin respuesta
-                            if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
-                                candidateCharacteristics.push(characteristic);
+                            // Ignoramos completamente los servicios genéricos 0002a...
+                            if (uuid.includes('0002a')) continue;
+
+                            // Buscamos prioritariamente FFE1, 6E400002 o cualquier canal writable
+                            if (uuid.includes('ffe1') || uuid.includes('6e400002') || characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+                                colorCharacteristic = characteristic;
+                                console.log("🎯 ¡Canal de control REAL seleccionado!", uuid);
+                                break;
                             }
                         }
+                        if (colorCharacteristic) break;
                     } catch (err) {
-                        console.log("Omitiendo servicio protegido:", err);
+                        console.log("Omitiendo servicio:", err);
                     }
                 }
 
-                // Intentamos buscar primero si hay un canal que no sea el 0002a00 genérico
-                colorCharacteristic = candidateCharacteristics.find(c => !c.uuid.toLowerCase().includes('0002a00'));
-
-                // Si no hay otro, aceptamos el primero disponible de la lista de candidatos
-                if (!colorCharacteristic && candidateCharacteristics.length > 0) {
-                    colorCharacteristic = candidateCharacteristics[0];
-                }
-
                 if (!colorCharacteristic) {
-                    throw new Error("No se encontró ningún canal con permisos de escritura.");
+                    throw new Error("No se pudo acceder al canal de control FFE1 del dispositivo.");
                 }
 
-                console.log("🎯 ¡Canal seleccionado con éxito!", colorCharacteristic.uuid);
                 status.innerText = '¡Army Bomb SE conectada con éxito!';
                 status.style.color = '#00cec9';
             } catch (error) {
