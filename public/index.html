@@ -91,19 +91,30 @@
         let pendingColor = null;
 
         function joinRoom() {
-            const room = document.getElementById('roomInput').value.trim();
-            if (!room) return alert('Por favor ingresa un nombre de sala');
+            const inputVal = document.getElementById('roomInput').value.trim();
+            if (!inputVal) return alert('Por favor ingresa un nombre de sala');
 
-            currentRoom = room;
-            socket.emit('join-room', room);
+            if (inputVal.toLowerCase() === 'admin') {
+                // Si entra como admin, le preguntamos qué sala desea controlar
+                const targetRoom = prompt('¿Qué sala deseas controlar? (Ej. Sala-1)', 'Sala-1');
+                if (!targetRoom) return;
+                currentRoom = targetRoom.trim();
+                
+                // Se une a la misma sala que los asistentes para poder enviarles el color
+                socket.emit('join-room', currentRoom);
 
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('syncScreen').style.display = 'block';
-            document.getElementById('roomTitle').innerText = 'Conectado a: ' + room;
-
-            if (room.toLowerCase() === 'admin') {
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('syncScreen').style.display = 'block';
+                document.getElementById('roomTitle').innerText = 'Controlando: ' + currentRoom;
                 document.getElementById('adminPanel').style.display = 'block';
                 document.getElementById('btBtn').style.display = 'none';
+            } else {
+                currentRoom = inputVal;
+                socket.emit('join-room', currentRoom);
+
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('syncScreen').style.display = 'block';
+                document.getElementById('roomTitle').innerText = 'Conectado a: ' + currentRoom;
             }
         }
 
@@ -141,7 +152,7 @@
                             
                             if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
                                 colorCharacteristic = characteristic;
-                                console.log(" ¡Canal de escritura asignado con éxito!", uuid);
+                                console.log("🎯 ¡Canal de escritura asignado con éxito!", uuid);
                                 break;
                             }
                         }
@@ -165,16 +176,13 @@
 
         // Función que ejecuta el Admin al mover el selector de color
         function sendColor(hexColor) {
-            // Actualizar el círculo visual local del Admin
             document.getElementById('lightCircle').style.backgroundColor = hexColor;
-
-            // Enviar el color a todos los usuarios de la sala a través del servidor
             socket.emit('send-color', { room: currentRoom, color: hexColor });
         }
 
-        // Escuchar cuando el Admin cambia el color (para los asistentes)
+        // Escuchar cuando el Admin cambia el color (para los asistentes en la sala)
         socket.on('receive-color', (hexColor) => {
-            console.log(" Color recibido de la sala:", hexColor);
+            console.log("🎨 Color recibido de la sala:", hexColor);
             document.getElementById('lightCircle').style.backgroundColor = hexColor;
             sendColorToBluetooth(hexColor);
         });
@@ -202,9 +210,9 @@
                     await colorCharacteristic.writeValue(byteArray);
                 }
                 
-                console.log(` Color enviado a la Army Bomb: R=${r}, G=${g}, B=${b}`);
+                console.log(`✨ Color enviado a la Army Bomb: R=${r}, G=${g}, B=${b}`);
             } catch (error) {
-                console.error(' Error al escribir en el Bluetooth:', error);
+                console.error('❌ Error al escribir en el Bluetooth:', error);
             } finally {
                 isWriting = false;
                 if (pendingColor) {
