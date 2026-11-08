@@ -133,19 +133,24 @@
                 status.innerText = 'Buscando canal de escritura...';
                 colorCharacteristic = null;
 
-                const services = await server.getPrimaryServices();
+               const services = await server.getPrimaryServices();
                 
                 for (const service of services) {
                     try {
                         const characteristics = await service.getCharacteristics();
                         for (const characteristic of characteristics) {
                             let uuid = characteristic.uuid.toLowerCase();
-                            console.log(`Canal: ${uuid} | Propiedades:`, characteristic.properties);
+                            console.log(`Canal detectado: ${uuid} | Propiedades:`, characteristic.properties);
                             
-                            // Si encontramos el canal ffe1 o un canal con escritura real, lo tomamos sin darnos por vencidos
-                            if (uuid.includes('ffe1') || uuid.includes('6e400002') || characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+                            // DESCARTAR INMEDIATAMENTE CUALQUIER UUID GENÉRICO DEL SISTEMA
+                            if (uuid.startsWith('0002') || uuid.startsWith('0003') || uuid.includes('0002a00')) {
+                                continue;
+                            }
+
+                            // ACEPTAR SOLO SI TIENE PERMISO DE ESCRITURA REAL
+                            if (characteristic.properties.write === true || characteristic.properties.writeWithoutResponse === true) {
                                 colorCharacteristic = characteristic;
-                                console.log(" ¡Canal de escritura SELECCIONADO con éxito!", uuid);
+                                console.log(" ¡Canal de escritura REAL seleccionado con éxito!", uuid);
                                 break;
                             }
                         }
