@@ -137,16 +137,21 @@
                         for (const characteristic of characteristics) {
                             console.log(`Canal: ${characteristic.uuid} | Propiedades:`, characteristic.properties);
                             
-                            // EXIGIMOS que el permiso de escritura sea verdaderamente true
-                            if (characteristic.properties.write === true || characteristic.properties.writeWithoutResponse === true) {
+                            // Ignoramos los canales genéricos del sistema que empiezan con 0002a
+                            if (characteristic.uuid.startsWith('0002a')) {
+                                continue;
+                            }
+
+                            // Buscamos un canal que realmente permita escritura
+                            if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
                                 colorCharacteristic = characteristic;
-                                console.log(" ¡Canal con escritura REAL encontrado!", characteristic.uuid);
+                                console.log(" ¡Canal de escritura SELECCIONADO con éxito!", characteristic.uuid);
                                 break;
                             }
                         }
                         if (colorCharacteristic) break;
                     } catch (err) {
-                        console.log("Omitiendo servicio protegido:", err);
+                        console.log("Omitiendo servicio:", err);
                     }
                 }
 
