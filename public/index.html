@@ -110,11 +110,10 @@
         async function connectArmyBomb() {
             try {
                 const status = document.getElementById('btStatus');
-                status.innerText = 'Buscando Army Bomb ...';
+                status.innerText = 'Buscando Army Bomb SE...';
                 
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
-                    // Incluimos todos los servicios posibles para forzar al navegador a descubrirlos
                     optionalServices: [
                         '0000ffe0-0000-1000-8000-00805f9b34fb',
                         '0000ffe1-0000-1000-8000-00805f9b34fb',
@@ -122,8 +121,7 @@
                         '6e400002-b5a3-f393-e0a9-e50e24dcca9e',
                         '49535343-fe7d-4ae5-8fa9-9fafd205e455',
                         '0000fff0-0000-1000-8000-00805f9b34fb',
-                        '0000180a-0000-1000-8000-00805f9b34fb',
-                        '00001800-0000-1000-8000-00805f9b34fb'
+                        '0000180a-0000-1000-8000-00805f9b34fb'
                     ]
                 });
 
@@ -133,7 +131,7 @@
                 status.innerText = 'Buscando canal de escritura...';
                 colorCharacteristic = null;
 
-               const services = await server.getPrimaryServices();
+                const services = await server.getPrimaryServices();
                 
                 for (const service of services) {
                     try {
@@ -142,15 +140,15 @@
                             let uuid = characteristic.uuid.toLowerCase();
                             console.log(`Canal detectado: ${uuid} | Propiedades:`, characteristic.properties);
                             
-                            // DESCARTAR INMEDIATAMENTE CUALQUIER UUID GENÉRICO DEL SISTEMA
-                            if (uuid.startsWith('0002') || uuid.startsWith('0003') || uuid.includes('0002a00')) {
+                            // Ignoramos estrictamente cualquier cosa que empiece con 0002 o 0003
+                            if (uuid.startsWith('0002') || uuid.startsWith('0003')) {
                                 continue;
                             }
 
-                            // ACEPTAR SOLO SI TIENE PERMISO DE ESCRITURA REAL
-                            if (characteristic.properties.write === true || characteristic.properties.writeWithoutResponse === true) {
+                            // Buscamos el canal UART / FFE1 / 6e400002 o uno que permita escritura sin ser del sistema
+                            if (uuid.includes('ffe1') || uuid.includes('6e400002') || uuid.includes('ffe2') || characteristic.properties.writeWithoutResponse === true) {
                                 colorCharacteristic = characteristic;
-                                console.log(" ¡Canal de escritura REAL seleccionado con éxito!", uuid);
+                                console.log("🎯 ¡Canal de control REAL seleccionado con éxito!", uuid);
                                 break;
                             }
                         }
@@ -160,25 +158,8 @@
                     }
                 }
 
-                // Plan de respaldo: Si el filtro estricto no halló nada, tomamos la primera característica disponible que tenga escritura
                 if (!colorCharacteristic) {
-                    for (const service of services) {
-                        try {
-                            const characteristics = await service.getCharacteristics();
-                            for (const characteristic of characteristics) {
-                                if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
-                                    colorCharacteristic = characteristic;
-                                    console.log(" Canal asignado por respaldo de escritura:", characteristic.uuid);
-                                    break;
-                                }
-                            }
-                            if (colorCharacteristic) break;
-                        } catch (e) {}
-                    }
-                }
-
-                if (!colorCharacteristic) {
-                    throw new Error("No se encontró ningún canal con permisos de escritura.");
+                    throw new Error("No se encontró el canal de control válido (FFE1/UART).");
                 }
 
                 status.innerText = '¡Army Bomb SE conectada con éxito!';
@@ -188,7 +169,6 @@
                 document.getElementById('btStatus').innerText = 'Error: ' + error.message;
             }
         }
-
         async function sendColorToBluetooth(hexColor) {
             if (!colorCharacteristic) return;
 
