@@ -106,12 +106,12 @@
                 document.getElementById('btBtn').style.display = 'none';
             }
         }
+
         async function connectArmyBomb() {
             try {
                 const status = document.getElementById('btStatus');
                 status.innerText = 'Buscando Army Bomb...';
                 
-                // Usamos acceptAllDevices para evitar que Windows oculte los servicios personalizados
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: [
@@ -139,10 +139,9 @@
                             let uuid = characteristic.uuid.toLowerCase();
                             console.log(`Canal detectado: ${uuid} | Propiedades:`, characteristic.properties);
                             
-                            // Si el canal permite escritura (con o sin respuesta), lo tomamos inmediatamente
                             if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
                                 colorCharacteristic = characteristic;
-                                console.log("🎯 ¡Canal de escritura asignado con éxito!", uuid);
+                                console.log(" ¡Canal de escritura asignado con éxito!", uuid);
                                 break;
                             }
                         }
@@ -163,6 +162,23 @@
                 document.getElementById('btStatus').innerText = 'Error: ' + error.message;
             }
         }
+
+        // Función que ejecuta el Admin al mover el selector de color
+        function sendColor(hexColor) {
+            // Actualizar el círculo visual local del Admin
+            document.getElementById('lightCircle').style.backgroundColor = hexColor;
+
+            // Enviar el color a todos los usuarios de la sala a través del servidor
+            socket.emit('send-color', { room: currentRoom, color: hexColor });
+        }
+
+        // Escuchar cuando el Admin cambia el color (para los asistentes)
+        socket.on('receive-color', (hexColor) => {
+            console.log(" Color recibido de la sala:", hexColor);
+            document.getElementById('lightCircle').style.backgroundColor = hexColor;
+            sendColorToBluetooth(hexColor);
+        });
+
         async function sendColorToBluetooth(hexColor) {
             if (!colorCharacteristic) return;
 
@@ -186,7 +202,7 @@
                     await colorCharacteristic.writeValue(byteArray);
                 }
                 
-                console.log(` Color enviado a la Army Bomb SE: R=${r}, G=${g}, B=${b}`);
+                console.log(` Color enviado a la Army Bomb: R=${r}, G=${g}, B=${b}`);
             } catch (error) {
                 console.error(' Error al escribir en el Bluetooth:', error);
             } finally {
@@ -198,6 +214,19 @@
                 }
             }
         }
+
+        function closeAllRooms() {
+            if (confirm('¿Estás seguro de cerrar la sesión global de la sala?')) {
+                socket.emit('close-room', currentRoom);
+                alert('Sesión finalizada.');
+                location.reload();
+            }
+        }
+
+        socket.on('room-closed', () => {
+            alert('El administrador ha finalizado la sesión de sincronización.');
+            location.reload();
+        });
     </script>
 </body>
 </html>
