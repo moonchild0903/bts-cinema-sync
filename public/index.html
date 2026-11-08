@@ -136,21 +136,22 @@
                         const characteristics = await service.getCharacteristics();
                         for (const characteristic of characteristics) {
                             console.log(`Canal: ${characteristic.uuid} | Propiedades:`, characteristic.properties);
-                            // Verificamos estrictamente que la característica permita escribir de verdad
+                            
+                            // VALIDACIÓN ESTRICTA: Solo aceptamos si permite write o writeWithoutResponse
                             if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
                                 colorCharacteristic = characteristic;
-                                console.log("🎯 ¡Canal de escritura válido encontrado!", characteristic.uuid);
+                                console.log("🎯 ¡Canal de escritura REAL encontrado!", characteristic.uuid);
                                 break;
                             }
                         }
                         if (colorCharacteristic) break;
                     } catch (err) {
-                        console.log("Omitiendo servicio:", err);
+                        console.log("Omitiendo servicio protegido:", err);
                     }
                 }
 
                 if (!colorCharacteristic) {
-                    throw new Error("No se encontró ningún canal de escritura válido.");
+                    throw new Error("No se encontró ningún canal con permisos de escritura.");
                 }
 
                 status.innerText = '¡Army Bomb SE conectada con éxito!';
