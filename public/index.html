@@ -104,27 +104,6 @@
                 document.getElementById('btBtn').style.display = 'none';
             }
         }
-
-        function sendColor(color) {
-            // El admin emite el cambio de color a toda la sala
-            socket.emit('change-color', { room: 'admin', targetRoom: 'Sala-1', color: color });
-            
-            // Si el admin también tiene una Army Bomb conectada en su misma pantalla, la actualiza localmente
-            if (typeof sendColorToBluetooth === 'function' && colorCharacteristic) {
-                sendColorToBluetooth(color);
-            }
-        }
-
-        socket.on('update-color', (data) => {
-            // Cambia el círculo visual en pantalla
-            document.getElementById('lightCircle').style.backgroundColor = data.color;
-            
-            // Envía el color al lightstick conectado por Bluetooth automáticamente
-            if (typeof sendColorToBluetooth === 'function') {
-                sendColorToBluetooth(data.color);
-            }
-        });
-
         async function connectArmyBomb() {
             try {
                 const status = document.getElementById('btStatus');
@@ -136,62 +115,44 @@
                         '0000ffe0-0000-1000-8000-00805f9b34fb',
                         '0000ffe1-0000-1000-8000-00805f9b34fb',
                         '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
-                        '6e400002-b5a3-f393-e0a9-e50e24dcca9e',
-                        '49535343-fe7d-4ae5-8fa9-9fafd205e455',
                         '0000fff0-0000-1000-8000-00805f9b34fb',
-                        '0000180a-0000-1000-8000-00805f9b34fb',
-                        '00001800-0000-1000-8000-00805f9b34fb'
+                        '0000180a-0000-1000-8000-00805f9b34fb'
                     ]
                 });
 
                 status.innerText = 'Conectando al dispositivo...';
                 const server = await bluetoothDevice.gatt.connect();
                 
-                status.innerText = 'Buscando canal de color SE...';
+                status.innerText = 'Buscando canal de escritura...';
                 colorCharacteristic = null;
 
                 const services = await server.getPrimaryServices();
                 
-                // Priorizamos el canal UART / FFE1 específico de la Army Bomb SE
                 for (const service of services) {
                     try {
                         const characteristics = await service.getCharacteristics();
                         for (const characteristic of characteristics) {
-                            if (characteristic.uuid.includes('ffe1') || characteristic.uuid.includes('6e400002') || characteristic.uuid.includes('fff1')) {
-                                if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
-                                    colorCharacteristic = characteristic;
+                            console.log(`Canal encontrado: ${characteristic.uuid} | Propiedades:`, characteristic.properties);
+                            if (characteristic.properties.writeWithoutResponse || characteristic.properties.write) {
+                                colorCharacteristic = characteristic;
+                                if (characteristic.properties.writeWithoutResponse) {
                                     break;
                                 }
                             }
                         }
-                        if (colorCharacteristic) break;
+                        if (colorCharacteristic && colorCharacteristic.properties.writeWithoutResponse) break;
                     } catch (err) {
-                        console.log("Omitiendo servicio:", err);
-                    }
-                }
-
-                // Fallback a cualquier canal de escritura si no coincide el UUID exacto
-                if (!colorCharacteristic) {
-                    for (const service of services) {
-                        try {
-                            const characteristics = await service.getCharacteristics();
-                            for (const characteristic of characteristics) {
-                                if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
-                                    colorCharacteristic = characteristic;
-                                    break;
-                                }
-                            }
-                            if (colorCharacteristic) break;
-                        } catch (err) {}
+                        console.log("Omitiendo servicio protegido:", err);
                     }
                 }
 
                 if (!colorCharacteristic) {
-                    throw new Error("No se encontró el canal de escritura SE.");
+                    throw new Error("No se encontró ningún canal de escritura válido.");
                 }
 
                 status.innerText = '¡Army Bomb SE conectada con éxito!';
                 status.style.color = '#00cec9';
+                console.log("✅ Canal de escritura seleccionado:", colorCharacteristic.uuid);
             } catch (error) {
                 console.error('Error de Bluetooth:', error);
                 document.getElementById('btStatus').innerText = 'Error: ' + error.message;
@@ -204,7 +165,6 @@
         async function sendColorToBluetooth(hexColor) {
             if (!colorCharacteristic) return;
 
-            // Si ya hay una operación en curso, guardamos el último color para enviarlo enseguida
             if (isWriting) {
                 pendingColor = hexColor;
                 return;
@@ -217,26 +177,19 @@
                 let g = parseInt(hexColor.slice(3, 5), 16);
                 let b = parseInt(hexColor.slice(5, 7), 16);
 
-                // Trama de 9 bytes del protocolo Fanlight BLE para Army Bomb SE
-                let bytes = [0x01, 0xFF, 0x00, r, g, b, 0x00, 0x00];
-                let checksum = 0;
-                for (let i = 2; i < bytes.length; i++) { checksum += bytes[i]; }
-                checksum = checksum & 0xFF;
-                let packet = new Uint8Array([...bytes, checksum]);
+                let byteArray = new Uint8Array([0x53, 0x03, r, g, b]);
 
-                // Usamos writeValueWithoutResponse para evitar bloqueos de cola en el GATT
                 if (colorCharacteristic.properties.writeWithoutResponse) {
-                    await colorCharacteristic.writeValueWithoutResponse(packet);
+                    await colorCharacteristic.writeValueWithoutResponse(byteArray);
                 } else {
-                    await colorCharacteristic.writeValue(packet);
+                    await colorCharacteristic.writeValue(byteArray);
                 }
                 
-                console.log(` Color aplicado en Army Bomb : R=${r}, G=${g}, B=${b}`);
+                console.log(`✅ Color enviado a la Army Bomb SE: R=${r}, G=${g}, B=${b}`);
             } catch (error) {
-                console.error(' Error al enviar color:', error);
+                console.error('❌ Error al escribir en el Bluetooth:', error);
             } finally {
                 isWriting = false;
-                // Si quedó un color pendiente mientras se escribía, lo procesamos ahora
                 if (pendingColor) {
                     let nextColor = pendingColor;
                     pendingColor = null;
