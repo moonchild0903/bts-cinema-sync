@@ -106,7 +106,6 @@
                 document.getElementById('btBtn').style.display = 'none';
             }
         }
-
         async function connectArmyBomb() {
             try {
                 const status = document.getElementById('btStatus');
@@ -119,7 +118,6 @@
                         '0000ffe1-0000-1000-8000-00805f9b34fb',
                         '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
                         '6e400002-b5a3-f393-e0a9-e50e24dcca9e',
-                        '49535343-fe7d-4ae5-8fa9-9fafd205e455',
                         '0000fff0-0000-1000-8000-00805f9b34fb',
                         '0000180a-0000-1000-8000-00805f9b34fb'
                     ]
@@ -132,6 +130,7 @@
                 colorCharacteristic = null;
 
                 const services = await server.getPrimaryServices();
+                let candidateCharacteristics = [];
                 
                 for (const service of services) {
                     try {
@@ -140,28 +139,29 @@
                             let uuid = characteristic.uuid.toLowerCase();
                             console.log(`Canal detectado: ${uuid} | Propiedades:`, characteristic.properties);
                             
-                            // Ignoramos estrictamente cualquier cosa que empiece con 0002 o 0003
-                            if (uuid.startsWith('0002') || uuid.startsWith('0003')) {
-                                continue;
-                            }
-
-                            // Buscamos el canal UART / FFE1 / 6e400002 o uno que permita escritura sin ser del sistema
-                            if (uuid.includes('ffe1') || uuid.includes('6e400002') || uuid.includes('ffe2') || characteristic.properties.writeWithoutResponse === true) {
-                                colorCharacteristic = characteristic;
-                                console.log("🎯 ¡Canal de control REAL seleccionado con éxito!", uuid);
-                                break;
+                            // Guardamos cualquier característica que tenga permisos de escritura o escritura sin respuesta
+                            if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+                                candidateCharacteristics.push(characteristic);
                             }
                         }
-                        if (colorCharacteristic) break;
                     } catch (err) {
-                        console.log("Omitiendo servicio:", err);
+                        console.log("Omitiendo servicio protegido:", err);
                     }
                 }
 
-                if (!colorCharacteristic) {
-                    throw new Error("No se encontró el canal de control válido (FFE1/UART).");
+                // Intentamos buscar primero si hay un canal que no sea el 0002a00 genérico
+                colorCharacteristic = candidateCharacteristics.find(c => !c.uuid.toLowerCase().includes('0002a00'));
+
+                // Si no hay otro, aceptamos el primero disponible de la lista de candidatos
+                if (!colorCharacteristic && candidateCharacteristics.length > 0) {
+                    colorCharacteristic = candidateCharacteristics[0];
                 }
 
+                if (!colorCharacteristic) {
+                    throw new Error("No se encontró ningún canal con permisos de escritura.");
+                }
+
+                console.log("🎯 ¡Canal seleccionado con éxito!", colorCharacteristic.uuid);
                 status.innerText = '¡Army Bomb SE conectada con éxito!';
                 status.style.color = '#00cec9';
             } catch (error) {
