@@ -80,7 +80,6 @@
             </div>
         </div>
     </div>
-
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
@@ -105,7 +104,7 @@
                 document.getElementById('syncScreen').style.display = 'block';
                 document.getElementById('roomTitle').innerText = 'Controlando: ' + currentRoom;
                 document.getElementById('adminPanel').style.display = 'block';
-                // Dejamos visible el botón de Bluetooth también para el admin por si acaso conecta su lightstick ahí
+                // Mostramos el botón de Bluetooth también en Admin para que puedas conectar el lightstick ahí si gustas
                 document.getElementById('btBtn').style.display = 'block';
             } else {
                 currentRoom = inputVal;
@@ -137,7 +136,7 @@
                 status.innerText = 'Conectando al dispositivo...';
                 const server = await bluetoothDevice.gatt.connect();
                 
-                status.innerText = 'Buscando canal de escritura...';
+                status.innerText = 'Buscando canal...';
                 colorCharacteristic = null;
 
                 const services = await server.getPrimaryServices();
@@ -149,8 +148,7 @@
                             let uuid = characteristic.uuid.toLowerCase();
                             console.log(`Canal detectado: ${uuid} | Propiedades:`, characteristic.properties);
                             
-                            // Aceptamos cualquier canal que tenga permisos de escritura (sin importar si es del sistema, para evitar que quede nulo)
-                            if (characteristic.properties.write || characteristic.properties.writeWithoutResponse || characteristic.properties.writeWithoutResponse === false) {
+                            if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
                                 colorCharacteristic = characteristic;
                                 console.log(" ¡Canal de escritura asignado con éxito!", uuid);
                                 break;
@@ -162,15 +160,14 @@
                     }
                 }
 
-                // Fallback absoluto por si ninguna característica marcó las propiedades clásicas
+                // Fallback flexible si las propiedades no vinieron explícitas
                 if (!colorCharacteristic) {
-                    const servicesList = await server.getPrimaryServices();
-                    for (const service of servicesList) {
+                    for (const service of services) {
                         try {
                             const chars = await service.getCharacteristics();
                             if (chars.length > 0) {
                                 colorCharacteristic = chars[0];
-                                console.log(" Canal asignado por fallback:", colorCharacteristic.uuid);
+                                console.log(" Canal asignado por respaldo:", colorCharacteristic.uuid);
                                 break;
                             }
                         } catch (e) {}
@@ -178,8 +175,9 @@
                 }
 
                 if (!colorCharacteristic) {
-                    throw new Error("No se pudo enlazar ningún canal de comunicación.");
+                    throw new Error("No se encontró ningún canal disponible.");
                 }
+
                 status.innerText = '¡Army Bomb conectada con éxito!';
                 status.style.color = '#00cec9';
             } catch (error) {
@@ -188,26 +186,26 @@
             }
         }
 
-        // Función que ejecuta el Admin al mover el selector de color
+        // Cuando el Admin cambia el color
         function sendColor(hexColor) {
             document.getElementById('lightCircle').style.backgroundColor = hexColor;
-            console.log("📤 Emitiendo color a la sala:", currentRoom, hexColor);
+            console.log(" Enviando color a la sala:", currentRoom, hexColor);
             socket.emit('send-color', { room: currentRoom, color: hexColor });
             
-            // Si el admin también conectó su lightstick en esta misma pestaña, lo manda directo
+            // Si el admin también tiene conectada su bomb aquí, se aplica
             sendColorToBluetooth(hexColor);
         }
 
-        // Escuchar cuando el servidor reenvía el color a la sala
+        // Escuchar la señal del servidor en la pestaña del asistente
         socket.on('receive-color', (hexColor) => {
-            console.log(" Color recibido por socket en la sala:", hexColor);
+            console.log(" ¡COLOR RECIBIDO POR SOCKET EN ESTA PESTAÑA!:", hexColor);
             document.getElementById('lightCircle').style.backgroundColor = hexColor;
             sendColorToBluetooth(hexColor);
         });
 
         async function sendColorToBluetooth(hexColor) {
             if (!colorCharacteristic) {
-                console.log(" No hay característica Bluetooth conectada en esta pestaña.");
+                console.log(" Dispositivo Bluetooth no vinculado en esta pestaña.");
                 return;
             }
 
@@ -225,15 +223,15 @@
 
                 let byteArray = new Uint8Array([0x53, 0x03, r, g, b]);
 
-                if (colorCharacteristic.properties.writeWithoutResponse) {
+                if (colorCharacteristic.properties && colorCharacteristic.properties.writeWithoutResponse) {
                     await colorCharacteristic.writeValueWithoutResponse(byteArray);
                 } else {
                     await colorCharacteristic.writeValue(byteArray);
                 }
                 
-                console.log(` Color enviado físicamente a la Army Bomb: R=${r}, G=${g}, B=${b}`);
+                console.log(` ¡COMANDO ENVIADO AL LIGHTSTICK! R=${r}, G=${g}, B=${b}`);
             } catch (error) {
-                console.error(' Error al escribir en el Bluetooth:', error);
+                console.error(' Error al escribir por Bluetooth:', error);
             } finally {
                 isWriting = false;
                 if (pendingColor) {
@@ -245,15 +243,14 @@
         }
 
         function closeAllRooms() {
-            if (confirm('¿Estás seguro de cerrar la sesión global de la sala?')) {
+            if (confirm('¿Cerrar sesión global?')) {
                 socket.emit('close-room', currentRoom);
-                alert('Sesión finalizada.');
                 location.reload();
             }
         }
 
         socket.on('room-closed', () => {
-            alert('El administrador ha finalizado la sesión de sincronización.');
+            alert('Sesión finalizada por el administrador.');
             location.reload();
         });
     </script>
