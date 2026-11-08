@@ -87,6 +87,8 @@
         let currentRoom = '';
         let bluetoothDevice = null;
         let colorCharacteristic = null;
+        let isWriting = false;
+        let pendingColor = null;
 
         function joinRoom() {
             const room = document.getElementById('roomInput').value.trim();
@@ -104,6 +106,7 @@
                 document.getElementById('btBtn').style.display = 'none';
             }
         }
+
         async function connectArmyBomb() {
             try {
                 const status = document.getElementById('btStatus');
@@ -132,15 +135,15 @@
                     try {
                         const characteristics = await service.getCharacteristics();
                         for (const characteristic of characteristics) {
-                            console.log(`Canal encontrado: ${characteristic.uuid} | Propiedades:`, characteristic.properties);
+                            console.log(`Canal: ${characteristic.uuid} | Propiedades:`, characteristic.properties);
+                            // Filtro estricto para aceptar únicamente características con permisos de escritura real
                             if (characteristic.properties.writeWithoutResponse || characteristic.properties.write) {
                                 colorCharacteristic = characteristic;
-                                if (characteristic.properties.writeWithoutResponse) {
-                                    break;
-                                }
+                                console.log("🎯 ¡Canal de escritura encontrado y seleccionado!", characteristic.uuid);
+                                break;
                             }
                         }
-                        if (colorCharacteristic && colorCharacteristic.properties.writeWithoutResponse) break;
+                        if (colorCharacteristic) break;
                     } catch (err) {
                         console.log("Omitiendo servicio protegido:", err);
                     }
@@ -152,15 +155,11 @@
 
                 status.innerText = '¡Army Bomb SE conectada con éxito!';
                 status.style.color = '#00cec9';
-                console.log("✅ Canal de escritura seleccionado:", colorCharacteristic.uuid);
             } catch (error) {
                 console.error('Error de Bluetooth:', error);
                 document.getElementById('btStatus').innerText = 'Error: ' + error.message;
             }
         }
-
-        let isWriting = false;
-        let pendingColor = null;
 
         async function sendColorToBluetooth(hexColor) {
             if (!colorCharacteristic) return;
