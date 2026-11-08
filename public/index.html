@@ -135,17 +135,18 @@
                     try {
                         const characteristics = await service.getCharacteristics();
                         for (const characteristic of characteristics) {
-                            console.log(`Canal: ${characteristic.uuid} | Propiedades:`, characteristic.properties);
+                            let uuid = characteristic.uuid.toLowerCase();
+                            console.log(`Canal: ${uuid} | Propiedades:`, characteristic.properties);
                             
-                            // Ignoramos los canales genéricos del sistema que empiezan con 0002a
-                            if (characteristic.uuid.startsWith('0002a')) {
+                            // Descartamos totalmente los canales genéricos del sistema
+                            if (uuid.startsWith('0002a') || uuid.includes('0002a00')) {
                                 continue;
                             }
 
-                            // Buscamos un canal que realmente permita escritura
-                            if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+                            // Priorizamos o buscamos directamente el canal FFE1 o uno con escritura real
+                            if (uuid.includes('ffe1') || uuid.includes('6e400002') || characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
                                 colorCharacteristic = characteristic;
-                                console.log(" ¡Canal de escritura SELECCIONADO con éxito!", characteristic.uuid);
+                                console.log(" ¡Canal de escritura SELECCIONADO con éxito!", uuid);
                                 break;
                             }
                         }
