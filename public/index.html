@@ -104,8 +104,7 @@
                 document.getElementById('syncScreen').style.display = 'block';
                 document.getElementById('roomTitle').innerText = 'Controlando: ' + currentRoom;
                 document.getElementById('adminPanel').style.display = 'block';
-                // Mostramos el botón de Bluetooth también en Admin para que puedas conectar el lightstick ahí si gustas
-                document.getElementById('btBtn').style.display = 'block';
+                document.getElementById('btBtn').style.display = 'none';
             } else {
                 currentRoom = inputVal;
                 socket.emit('join-room', currentRoom);
@@ -115,7 +114,6 @@
                 document.getElementById('roomTitle').innerText = 'Conectado a: ' + currentRoom;
             }
         }
-
         async function connectArmyBomb() {
             try {
                 const status = document.getElementById('btStatus');
@@ -138,7 +136,6 @@
                 
                 status.innerText = 'Buscando canal...';
                 colorCharacteristic = null;
-
                 const services = await server.getPrimaryServices();
                 
                 for (const service of services) {
@@ -148,9 +145,15 @@
                             let uuid = characteristic.uuid.toLowerCase();
                             console.log(`Canal detectado: ${uuid} | Propiedades:`, characteristic.properties);
                             
+                            // Ignoramos por completo los canales 0002a del sistema ya que dan error GATT
+                            if (uuid.startsWith('0002a')) {
+                                continue;
+                            }
+                            
+                            // Buscamos un canal que realmente permita escritura
                             if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
                                 colorCharacteristic = characteristic;
-                                console.log(" ¡Canal de escritura asignado con éxito!", uuid);
+                                console.log("¡Canal de escritura válido encontrado!", uuid);
                                 break;
                             }
                         }
@@ -160,22 +163,27 @@
                     }
                 }
 
-                // Fallback flexible si las propiedades no vinieron explícitas
+                // Si por restricciones de Windows ningún canal pasa el filtro estricto, 
+                // tomamos el primer servicio personalizado disponible en lugar del 0002a
                 if (!colorCharacteristic) {
                     for (const service of services) {
                         try {
-                            const chars = await service.getCharacteristics();
-                            if (chars.length > 0) {
-                                colorCharacteristic = chars[0];
-                                console.log(" Canal asignado por respaldo:", colorCharacteristic.uuid);
-                                break;
+                            const characteristics = await service.getCharacteristics();
+                            for (const characteristic of characteristics) {
+                                let uuid = characteristic.uuid.toLowerCase();
+                                if (!uuid.startsWith('0002a')) {
+                                    colorCharacteristic = characteristic;
+                                    console.log("Canal alternativo seguro asignado:", uuid);
+                                    break;
+                                }
                             }
+                            if (colorCharacteristic) break;
                         } catch (e) {}
                     }
                 }
 
                 if (!colorCharacteristic) {
-                    throw new Error("No se encontró ningún canal disponible.");
+                    throw new Error("No se encontró ningún canal de control compatible.");
                 }
 
                 status.innerText = '¡Army Bomb conectada con éxito!';
