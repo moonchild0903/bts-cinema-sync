@@ -115,84 +115,76 @@
             }
         }
         async function connectArmyBomb() {
-            try {
-                const status = document.getElementById('btStatus');
-                status.innerText = 'Buscando Army Bomb...';
-                
-                bluetoothDevice = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: [
-                        '0000ffe0-0000-1000-8000-00805f9b34fb',
-                        '0000ffe1-0000-1000-8000-00805f9b34fb',
-                        '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
-                        '6e400002-b5a3-f393-e0a9-e50e24dcca9e',
-                        '0000fff0-0000-1000-8000-00805f9b34fb',
-                        '0000180a-0000-1000-8000-00805f9b34fb'
-                    ]
-                });
+    try {
+        const status = document.getElementById('btStatus');
+        status.innerText = 'Buscando Army Bomb...';
+        
+        bluetoothDevice = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: [
+                '0000ffe0-0000-1000-8000-00805f9b34fb',
+                '0000ffe1-0000-1000-8000-00805f9b34fb',
+                '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+                '6e400002-b5a3-f393-e0a9-e50e24dcca9e',
+                '0000fff0-0000-1000-8000-00805f9b34fb',
+                '0000180a-0000-1000-8000-00805f9b34fb'
+            ]
+        });
 
-                status.innerText = 'Conectando al dispositivo...';
-                const server = await bluetoothDevice.gatt.connect();
-                
-                status.innerText = 'Buscando canal...';
-                colorCharacteristic = null;
-                const services = await server.getPrimaryServices();
-                
-                for (const service of services) {
-                    try {
-                        const characteristics = await service.getCharacteristics();
-                        for (const characteristic of characteristics) {
-                            let uuid = characteristic.uuid.toLowerCase();
-                            console.log(`Canal detectado: ${uuid} | Propiedades:`, characteristic.properties);
-                            
-                            // Ignoramos por completo los canales 0002a del sistema ya que dan error GATT
-                            if (uuid.startsWith('0002a')) {
-                                continue;
-                            }
-                            
-                            // Buscamos un canal que realmente permita escritura
-                            if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
-                                colorCharacteristic = characteristic;
-                                console.log("¡Canal de escritura válido encontrado!", uuid);
-                                break;
-                            }
+        status.innerText = 'Conectando al dispositivo...';
+        const server = await bluetoothDevice.gatt.connect();
+        
+        status.innerText = 'Buscando canal...';
+        colorCharacteristic = null;
+
+        const services = await server.getPrimaryServices();
+        
+        // Paso 1: Buscar primero en servicios personalizados conocidos
+        for (const service of services) {
+            let sUuid = service.uuid.toLowerCase();
+            if (sUuid.includes('ffe0') || sUuid.includes('6e400001') || sUuid.includes('fff0')) {
+                try {
+                    const characteristics = await service.getCharacteristics();
+                    for (const characteristic of characteristics) {
+                        let uuid = characteristic.uuid.toLowerCase();
+                        if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+                            colorCharacteristic = characteristic;
+                            break;
                         }
-                        if (colorCharacteristic) break;
-                    } catch (err) {
-                        console.log("Omitiendo servicio:", err);
                     }
-                }
-
-                // Si por restricciones de Windows ningún canal pasa el filtro estricto, 
-                // tomamos el primer servicio personalizado disponible en lugar del 0002a
-                if (!colorCharacteristic) {
-                    for (const service of services) {
-                        try {
-                            const characteristics = await service.getCharacteristics();
-                            for (const characteristic of characteristics) {
-                                let uuid = characteristic.uuid.toLowerCase();
-                                if (!uuid.startsWith('0002a')) {
-                                    colorCharacteristic = characteristic;
-                                    console.log("Canal alternativo seguro asignado:", uuid);
-                                    break;
-                                }
-                            }
-                            if (colorCharacteristic) break;
-                        } catch (e) {}
-                    }
-                }
-
-                if (!colorCharacteristic) {
-                    throw new Error("No se encontró ningún canal de control compatible.");
-                }
-
-                status.innerText = '¡Army Bomb conectada con éxito!';
-                status.style.color = '#00cec9';
-            } catch (error) {
-                console.error('Error de Bluetooth:', error);
-                document.getElementById('btStatus').innerText = 'Error: ' + error.message;
+                    if (colorCharacteristic) break;
+                } catch (err) {}
             }
         }
+
+        // Paso 2: Bloque de respaldo si no se asignó en el primer paso (excluyendo los canales 0002a)
+        if (!colorCharacteristic) {
+            for (const service of services) {
+                try {
+                    const characteristics = await service.getCharacteristics();
+                    for (const characteristic of characteristics) {
+                        let uuid = characteristic.uuid.toLowerCase();
+                        if (!uuid.startsWith('0002a')) {
+                            colorCharacteristic = characteristic;
+                            break;
+                        }
+                    }
+                    if (colorCharacteristic) break;
+                } catch (e) {}
+            }
+        }
+
+        if (!colorCharacteristic) {
+            throw new Error("No se encontró ningún canal de control válido para la Army Bomb.");
+        }
+
+        status.innerText = '¡Army Bomb conectada con éxito!';
+        status.style.color = '#00cec9';
+    } catch (error) {
+        console.error('Error de Bluetooth:', error);
+        document.getElementById('btStatus').innerText = 'Error: ' + error.message;
+    }
+}
 
         // Cuando el Admin cambia el color
         function sendColor(hexColor) {
