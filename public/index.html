@@ -109,21 +109,18 @@
         async function connectArmyBomb() {
             try {
                 const status = document.getElementById('btStatus');
-                status.innerText = 'Buscando Army Bomb SE...';
+                status.innerText = 'Buscando Army Bomb...';
                 
-                // Filtramos directamente por los UUIDs para forzar al navegador a exponer FFE0/FFE1
+                // Usamos acceptAllDevices para evitar que Windows oculte los servicios personalizados
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
-                    filters: [
-                        { services: ['0000ffe0-0000-1000-8000-00805f9b34fb'] },
-                        { services: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] },
-                        { namePrefix: 'BTS' },
-                        { namePrefix: 'Army' }
-                    ],
+                    acceptAllDevices: true,
                     optionalServices: [
                         '0000ffe0-0000-1000-8000-00805f9b34fb',
                         '0000ffe1-0000-1000-8000-00805f9b34fb',
                         '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
-                        '6e400002-b5a3-f393-e0a9-e50e24dcca9e'
+                        '6e400002-b5a3-f393-e0a9-e50e24dcca9e',
+                        '0000fff0-0000-1000-8000-00805f9b34fb',
+                        '0000180a-0000-1000-8000-00805f9b34fb'
                     ]
                 });
 
@@ -142,27 +139,24 @@
                             let uuid = characteristic.uuid.toLowerCase();
                             console.log(`Canal detectado: ${uuid} | Propiedades:`, characteristic.properties);
                             
-                            // Ignoramos completamente los servicios genéricos 0002a...
-                            if (uuid.includes('0002a')) continue;
-
-                            // Buscamos prioritariamente FFE1, 6E400002 o cualquier canal writable
-                            if (uuid.includes('ffe1') || uuid.includes('6e400002') || characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+                            // Si el canal permite escritura (con o sin respuesta), lo tomamos inmediatamente
+                            if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
                                 colorCharacteristic = characteristic;
-                                console.log("🎯 ¡Canal de control REAL seleccionado!", uuid);
+                                console.log("🎯 ¡Canal de escritura asignado con éxito!", uuid);
                                 break;
                             }
                         }
                         if (colorCharacteristic) break;
                     } catch (err) {
-                        console.log("Omitiendo servicio:", err);
+                        console.log("Omitiendo servicio protegido:", err);
                     }
                 }
 
                 if (!colorCharacteristic) {
-                    throw new Error("No se pudo acceder al canal de control FFE1 del dispositivo.");
+                    throw new Error("No se encontró ningún canal con permisos de escritura.");
                 }
 
-                status.innerText = '¡Army Bomb SE conectada con éxito!';
+                status.innerText = '¡Army Bomb conectada con éxito!';
                 status.style.color = '#00cec9';
             } catch (error) {
                 console.error('Error de Bluetooth:', error);
