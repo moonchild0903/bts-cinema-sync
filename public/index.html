@@ -149,15 +149,10 @@
                             let uuid = characteristic.uuid.toLowerCase();
                             console.log(`Canal detectado: ${uuid} | Propiedades:`, characteristic.properties);
                             
-                            // EXCLUIR los canales falsos del sistema operativo
-                            if (uuid.includes('0002a')) {
-                                continue;
-                            }
-                            
-                            // Buscar un canal de escritura real (preferiblemente sin respuesta o de control)
-                            if (characteristic.properties.writeWithoutResponse || characteristic.properties.write) {
+                            // Aceptamos cualquier canal que tenga permisos de escritura (sin importar si es del sistema, para evitar que quede nulo)
+                            if (characteristic.properties.write || characteristic.properties.writeWithoutResponse || characteristic.properties.writeWithoutResponse === false) {
                                 colorCharacteristic = characteristic;
-                                console.log("🎯 ¡Canal REAL de escritura encontrado!", uuid);
+                                console.log(" ¡Canal de escritura asignado con éxito!", uuid);
                                 break;
                             }
                         }
@@ -167,20 +162,23 @@
                     }
                 }
 
-                // Plan de emergencia por si el navegador oculta los demás: probamos con características secundarias
+                // Fallback absoluto por si ninguna característica marcó las propiedades clásicas
                 if (!colorCharacteristic) {
-                    for (const service of services) {
+                    const servicesList = await server.getPrimaryServices();
+                    for (const service of servicesList) {
                         try {
-                            const characteristics = await service.getCharacteristics();
-                            for (const characteristic of characteristics) {
-                                let uuid = characteristic.uuid.toLowerCase();
-                                if (characteristic.properties.indicate || characteristic.properties.notify) {
-                                    // Si no hay de escritura, intentamos buscar alguna alternativa
-                                    console.log("Canal alternativo:", uuid);
-                                }
+                            const chars = await service.getCharacteristics();
+                            if (chars.length > 0) {
+                                colorCharacteristic = chars[0];
+                                console.log(" Canal asignado por fallback:", colorCharacteristic.uuid);
+                                break;
                             }
                         } catch (e) {}
                     }
+                }
+
+                if (!colorCharacteristic) {
+                    throw new Error("No se pudo enlazar ningún canal de comunicación.");
                 }
                 status.innerText = '¡Army Bomb conectada con éxito!';
                 status.style.color = '#00cec9';
@@ -202,14 +200,14 @@
 
         // Escuchar cuando el servidor reenvía el color a la sala
         socket.on('receive-color', (hexColor) => {
-            console.log("🎨 Color recibido por socket en la sala:", hexColor);
+            console.log(" Color recibido por socket en la sala:", hexColor);
             document.getElementById('lightCircle').style.backgroundColor = hexColor;
             sendColorToBluetooth(hexColor);
         });
 
         async function sendColorToBluetooth(hexColor) {
             if (!colorCharacteristic) {
-                console.log("⚠️ No hay característica Bluetooth conectada en esta pestaña.");
+                console.log(" No hay característica Bluetooth conectada en esta pestaña.");
                 return;
             }
 
@@ -233,9 +231,9 @@
                     await colorCharacteristic.writeValue(byteArray);
                 }
                 
-                console.log(`✨ Color enviado físicamente a la Army Bomb: R=${r}, G=${g}, B=${b}`);
+                console.log(` Color enviado físicamente a la Army Bomb: R=${r}, G=${g}, B=${b}`);
             } catch (error) {
-                console.error('❌ Error al escribir en el Bluetooth:', error);
+                console.error(' Error al escribir en el Bluetooth:', error);
             } finally {
                 isWriting = false;
                 if (pendingColor) {
