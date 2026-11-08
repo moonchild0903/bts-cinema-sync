@@ -137,10 +137,10 @@
                         for (const characteristic of characteristics) {
                             console.log(`Canal: ${characteristic.uuid} | Propiedades:`, characteristic.properties);
                             
-                            // VALIDACIÓN ESTRICTA: Solo aceptamos si permite write o writeWithoutResponse
-                            if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+                            // EXIGIMOS que el permiso de escritura sea verdaderamente true
+                            if (characteristic.properties.write === true || characteristic.properties.writeWithoutResponse === true) {
                                 colorCharacteristic = characteristic;
-                                console.log("🎯 ¡Canal de escritura REAL encontrado!", characteristic.uuid);
+                                console.log(" ¡Canal con escritura REAL encontrado!", characteristic.uuid);
                                 break;
                             }
                         }
