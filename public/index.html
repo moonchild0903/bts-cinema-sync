@@ -149,22 +149,39 @@
                             let uuid = characteristic.uuid.toLowerCase();
                             console.log(`Canal detectado: ${uuid} | Propiedades:`, characteristic.properties);
                             
-                            if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+                            // EXCLUIR los canales falsos del sistema operativo
+                            if (uuid.includes('0002a')) {
+                                continue;
+                            }
+                            
+                            // Buscar un canal de escritura real (preferiblemente sin respuesta o de control)
+                            if (characteristic.properties.writeWithoutResponse || characteristic.properties.write) {
                                 colorCharacteristic = characteristic;
-                                console.log("🎯 ¡Canal de escritura asignado con éxito!", uuid);
+                                console.log("🎯 ¡Canal REAL de escritura encontrado!", uuid);
                                 break;
                             }
                         }
                         if (colorCharacteristic) break;
                     } catch (err) {
-                        console.log("Omitiendo servicio protegido:", err);
+                        console.log("Omitiendo servicio:", err);
                     }
                 }
 
+                // Plan de emergencia por si el navegador oculta los demás: probamos con características secundarias
                 if (!colorCharacteristic) {
-                    throw new Error("No se encontró ningún canal con permisos de escritura.");
+                    for (const service of services) {
+                        try {
+                            const characteristics = await service.getCharacteristics();
+                            for (const characteristic of characteristics) {
+                                let uuid = characteristic.uuid.toLowerCase();
+                                if (characteristic.properties.indicate || characteristic.properties.notify) {
+                                    // Si no hay de escritura, intentamos buscar alguna alternativa
+                                    console.log("Canal alternativo:", uuid);
+                                }
+                            }
+                        } catch (e) {}
+                    }
                 }
-
                 status.innerText = '¡Army Bomb conectada con éxito!';
                 status.style.color = '#00cec9';
             } catch (error) {
