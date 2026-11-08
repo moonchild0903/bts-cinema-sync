@@ -95,19 +95,18 @@
             if (!inputVal) return alert('Por favor ingresa un nombre de sala');
 
             if (inputVal.toLowerCase() === 'admin') {
-                // Si entra como admin, le preguntamos qué sala desea controlar
                 const targetRoom = prompt('¿Qué sala deseas controlar? (Ej. Sala-1)', 'Sala-1');
                 if (!targetRoom) return;
                 currentRoom = targetRoom.trim();
                 
-                // Se une a la misma sala que los asistentes para poder enviarles el color
                 socket.emit('join-room', currentRoom);
 
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('syncScreen').style.display = 'block';
                 document.getElementById('roomTitle').innerText = 'Controlando: ' + currentRoom;
                 document.getElementById('adminPanel').style.display = 'block';
-                document.getElementById('btBtn').style.display = 'none';
+                // Dejamos visible el botón de Bluetooth también para el admin por si acaso conecta su lightstick ahí
+                document.getElementById('btBtn').style.display = 'block';
             } else {
                 currentRoom = inputVal;
                 socket.emit('join-room', currentRoom);
@@ -177,18 +176,25 @@
         // Función que ejecuta el Admin al mover el selector de color
         function sendColor(hexColor) {
             document.getElementById('lightCircle').style.backgroundColor = hexColor;
+            console.log("📤 Emitiendo color a la sala:", currentRoom, hexColor);
             socket.emit('send-color', { room: currentRoom, color: hexColor });
+            
+            // Si el admin también conectó su lightstick en esta misma pestaña, lo manda directo
+            sendColorToBluetooth(hexColor);
         }
 
-        // Escuchar cuando el Admin cambia el color (para los asistentes en la sala)
+        // Escuchar cuando el servidor reenvía el color a la sala
         socket.on('receive-color', (hexColor) => {
-            console.log("🎨 Color recibido de la sala:", hexColor);
+            console.log("🎨 Color recibido por socket en la sala:", hexColor);
             document.getElementById('lightCircle').style.backgroundColor = hexColor;
             sendColorToBluetooth(hexColor);
         });
 
         async function sendColorToBluetooth(hexColor) {
-            if (!colorCharacteristic) return;
+            if (!colorCharacteristic) {
+                console.log("⚠️ No hay característica Bluetooth conectada en esta pestaña.");
+                return;
+            }
 
             if (isWriting) {
                 pendingColor = hexColor;
@@ -210,7 +216,7 @@
                     await colorCharacteristic.writeValue(byteArray);
                 }
                 
-                console.log(`✨ Color enviado a la Army Bomb: R=${r}, G=${g}, B=${b}`);
+                console.log(`✨ Color enviado físicamente a la Army Bomb: R=${r}, G=${g}, B=${b}`);
             } catch (error) {
                 console.error('❌ Error al escribir en el Bluetooth:', error);
             } finally {
