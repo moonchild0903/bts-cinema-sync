@@ -136,16 +136,16 @@
                         const characteristics = await service.getCharacteristics();
                         for (const characteristic of characteristics) {
                             console.log(`Canal: ${characteristic.uuid} | Propiedades:`, characteristic.properties);
-                            // Filtro estricto para aceptar únicamente características con permisos de escritura real
-                            if (characteristic.properties.writeWithoutResponse || characteristic.properties.write) {
+                            // Verificamos estrictamente que la característica permita escribir de verdad
+                            if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
                                 colorCharacteristic = characteristic;
-                                console.log("🎯 ¡Canal de escritura encontrado y seleccionado!", characteristic.uuid);
+                                console.log("🎯 ¡Canal de escritura válido encontrado!", characteristic.uuid);
                                 break;
                             }
                         }
                         if (colorCharacteristic) break;
                     } catch (err) {
-                        console.log("Omitiendo servicio protegido:", err);
+                        console.log("Omitiendo servicio:", err);
                     }
                 }
 
